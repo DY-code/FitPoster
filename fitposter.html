@@ -1,0 +1,2191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FitPoster - 健身壁纸生成器</title>
+    
+    <!-- Tailwind CSS (样式库) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: '#00D4FF',
+              secondary: '#FF0055',
+              dark: '#0F172A',
+              card: '#1E293B',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+    
+    <!-- React & ReactDOM (核心框架) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel (让浏览器能运行 React 代码) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #0F172A;
+        color: white;
+      }
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: #0F172A; }
+      ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #475569; }
+      
+      /* Animation Utilities */
+      .fade-in { animation: fadeIn 0.5s ease-in; }
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+      /* Loading 和错误提示样式 */
+      #resource-loader-overlay {
+        position: fixed;
+        inset: 0;
+        background-color: #0F172A;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.3s ease;
+      }
+      
+      #resource-loader-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      
+      .loader-content {
+        text-align: center;
+      }
+      
+      .pulse-container {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 24px;
+      }
+      
+      .pulse-dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #00D4FF, #FF0055);
+        animation: pulse 1.4s ease-in-out infinite;
+      }
+      
+      .pulse-dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      
+      .pulse-dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      
+      @keyframes pulse {
+        0%, 100% {
+          transform: scale(0.8);
+          opacity: 0.5;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 1;
+        }
+      }
+      
+      .error-panel {
+        background: #1E293B;
+        border: 2px solid #EF4444;
+        border-radius: 16px;
+        padding: 32px;
+        max-width: 600px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+      
+      .error-icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 20px;
+        background: #FEE2E2;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+      }
+      
+      .error-title {
+        color: #EF4444;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 16px;
+      }
+      
+      .error-list {
+        background: #0F172A;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 20px 0;
+        text-align: left;
+      }
+      
+      .error-item {
+        color: #F87171;
+        font-size: 14px;
+        margin: 8px 0;
+        padding-left: 24px;
+        position: relative;
+      }
+      
+      .error-item:before {
+        content: "✗";
+        position: absolute;
+        left: 0;
+        color: #EF4444;
+        font-weight: bold;
+      }
+      
+      .error-hint {
+        color: #94A3B8;
+        font-size: 14px;
+        margin: 16px 0;
+        line-height: 1.6;
+      }
+      
+      .error-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 24px;
+      }
+      
+      .btn-retry, .btn-help {
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        font-size: 14px;
+      }
+      
+      .btn-retry {
+        background: #00D4FF;
+        color: #0F172A;
+      }
+      
+      .btn-retry:hover {
+        background: #22D3EE;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
+      }
+      
+      .btn-help {
+        background: transparent;
+        color: #94A3B8;
+        border: 2px solid #334155;
+      }
+      
+      .btn-help:hover {
+        color: #E2E8F0;
+        border-color: #475569;
+      }
+      
+      .help-section {
+        display: none;
+        background: #0F172A;
+        border-radius: 8px;
+        padding: 16px;
+        margin-top: 16px;
+        text-align: left;
+      }
+      
+      .help-section.show {
+        display: block;
+        animation: fadeIn 0.3s ease;
+      }
+      
+      .help-section h4 {
+        color: #00D4FF;
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 12px;
+      }
+      
+      .help-section ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      
+      .help-section li {
+        color: #94A3B8;
+        font-size: 13px;
+        margin: 8px 0;
+        padding-left: 20px;
+        position: relative;
+      }
+      
+      .help-section li:before {
+        content: "•";
+        position: absolute;
+        left: 0;
+        color: #00D4FF;
+      }
+      
+      .retry-warning {
+        display: none;
+        background: #451A03;
+        border: 1px solid #F59E0B;
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 16px;
+        color: #FCD34D;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      
+      .retry-warning.show {
+        display: block;
+        animation: fadeIn 0.3s ease;
+      }
+    </style>
+</head>
+<body>
+    <!-- 资源加载状态覆盖层 -->
+    <div id="resource-loader-overlay">
+        <div class="loader-content">
+            <!-- Loading 状态 -->
+            <div id="loading-state">
+                <div class="pulse-container">
+                    <div class="pulse-dot"></div>
+                    <div class="pulse-dot"></div>
+                    <div class="pulse-dot"></div>
+                </div>
+                <p style="color: #94A3B8; font-size: 16px; font-weight: 500;">正在加载资源...</p>
+            </div>
+            
+            <!-- 错误状态 -->
+            <div id="error-state" style="display: none;">
+                <div class="error-panel">
+                    <div class="error-icon">⚠️</div>
+                    <div class="error-title">资源加载失败</div>
+                    
+                    <div class="error-list" id="error-details">
+                        <!-- 动态插入失败项 -->
+                    </div>
+                    
+                    <div class="error-hint">
+                        这通常是由于网络问题或 CDN 访问受限导致的。<br>
+                        请点击"重试"按钮刷新页面，或查看下方帮助信息。
+                    </div>
+                    
+                    <!-- 多次重试警告 -->
+                    <div class="retry-warning" id="retry-warning">
+                        ⚠️ 检测到多次重试失败，请检查您的网络连接状态，或尝试：<br>
+                        • 切换到其他网络（如手机热点）<br>
+                        • 检查防火墙或代理设置<br>
+                        • 稍后再试
+                    </div>
+                    
+                    <div class="error-actions">
+                        <button class="btn-retry" onclick="handleRetry()">🔄 重试</button>
+                        <button class="btn-help" onclick="toggleHelp()">❓ 查看帮助</button>
+                    </div>
+                    
+                    <!-- 帮助信息 -->
+                    <div class="help-section" id="help-section">
+                        <h4>故障排查指引</h4>
+                        <ul>
+                            <li>确认您的设备已连接到互联网</li>
+                            <li>尝试访问其他网站，确认网络连通性</li>
+                            <li>检查是否启用了广告拦截或隐私保护插件（可能阻止 CDN 资源）</li>
+                            <li>如果在公司或学校网络，可能存在防火墙限制</li>
+                            <li>尝试使用其他浏览器（Chrome/Edge/Firefox）</li>
+                            <li>清除浏览器缓存后重试</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="root"></div>
+
+    <!-- 核心应用代码 -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- 1. 图标组件 (SVG Paths) ---
+        const ICONS = {
+            Dumbbell: <path d="M6.5 6.5l11 11M21 21l-1-1a2.828 2.828 0 0 1 0-4l1-1m-17 6l1-1a2.828 2.828 0 0 0 0-4l-1-1m17-10l-4.5 4.5M3 3l1 1a2.828 2.828 0 0 0 4 0l1-1m-6 5l4.5-4.5m1 11l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>,
+            PlusCircle: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></g>,
+            Flame: <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.5-3.3.3-1.1.9-2.07 1.8-2.2.2.14.3.4.2.7z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+            Clock: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></g>,
+            Download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+            Upload: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+            Save: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></g>,
+            Sparkles: <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+            RefreshCw: <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 21v-5h5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+            BarChart3: <path d="M3 3v18h18M18 17V9M13 17V5M8 17v-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+            Palette: <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5m-6.5 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0m2.5 4a1 1 0 1 1-2 0 1 1 0 0 1 2 0m3 4a1 1 0 1 1-2 0 1 1 0 0 1 2 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+            Activity: <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
+            Database: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></g>,
+            PieChart: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></g>,
+            LineChart: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-5 5-4-4-6 6"/></g>,
+            Image: <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"></rect>,
+            ImagePlus: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"/><line x1="16" y1="5" x2="22" y2="5"/><line x1="19" y1="2" x2="19" y2="8"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></g>,
+            Trash2: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></g>,
+            MapPin: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></g>,
+            Crop: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></g>,
+            GripVertical: <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></g>
+        };
+
+        // 图表模式与数据维度
+        const ChartMode = {
+            CURVE: 'Curve',    // 曲线
+            LINE: 'Line',      // 折线
+            BAR: 'Bar'         // 柱状
+        };
+
+        const DataMetric = {
+            DURATION: 'Duration', // 时长
+            CALORIES: 'Calories', // 热量
+            STEPS: 'Steps',       // 步数
+            DISTANCE: 'Distance', // 距离
+            PACE: 'Pace'          // 配速 (min/km)
+        };
+
+        const Icon = ({ name, size = 20, className = "" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                className={className}
+            >
+                {ICONS[name] || null}
+            </svg>
+        );
+
+        /**
+         * 从 workout 对象中提取标准化的日期对象
+         * 支持从 date 字段或 id 字段（格式：YYYY-MM-DD-N）解析
+         * @param {Object} workout - 运动记录对象
+         * @returns {Date} 日期对象，解析失败时返回 1970-01-01
+         */
+        const getWorkoutDate = (workout) => {
+            // 优先使用 date 字段
+            if (workout.date) {
+                const d = new Date(workout.date);
+                if (!isNaN(d.getTime())) return d;
+            }
+            // 从 id 解析（格式：YYYY-MM-DD-N 或 YYYY-M-D-N）
+            if (workout.id && typeof workout.id === 'string') {
+                const parts = workout.id.split('-');
+                if (parts.length >= 3) {
+                    const d = new Date(`${parts[0]}-${parts[1]}-${parts[2]}`);
+                    if (!isNaN(d.getTime())) return d;
+                }
+            }
+            return new Date(0); // 兜底：返回最早日期
+        };
+
+        /**
+         * 统一的日期排序比较器
+         * @param {Object} a - 运动记录对象 A
+         * @param {Object} b - 运动记录对象 B
+         * @returns {number} 排序结果（负数/0/正数）
+         */
+        const sortByDate = (a, b) => getWorkoutDate(a) - getWorkoutDate(b);
+
+        /**
+         * 计算距离最后一次运动的天数
+         * @param {Array} typeData - 运动记录数组
+         * @returns {number} 天数差距，如果无数据返回 0
+         */
+        const calculateDaysSinceLastWorkout = (typeData) => {
+            if (!typeData || typeData.length === 0) return 0;
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const latestWorkout = typeData[typeData.length - 1]; // 假设已排序
+            const workoutDate = getWorkoutDate(latestWorkout);
+            workoutDate.setHours(0, 0, 0, 0);
+            
+            return Math.floor((today - workoutDate) / (1000 * 60 * 60 * 24));
+        };
+
+        /**
+         * 获取运动中断提醒配置
+         * @param {number} daysSince - 距离最后一次运动的天数
+         * @param {string} sportType - 运动类型（如 "Running" 或 "DailySummary"）
+         * @param {number} recordCount - 历史记录数量
+         * @returns {Object|null} 返回 { text, color, emoji } 或 null（不显示提醒）
+         */
+        const getReminderConfig = (daysSince, sportType, recordCount) => {
+            // 不满足提醒条件：记录数 < 2 或 天数 ≤ 3
+            if (recordCount < 2 || daysSince <= 3) return null;
+            
+            // 确定颜色和图标
+            let color, emoji;
+            if (daysSince >= 8) {
+                color = '#EF4444'; // 红色
+                emoji = '🔥';
+            } else if (daysSince >= 6) {
+                color = '#FB923C'; // 橙色
+                emoji = '⚠️';
+            } else {
+                color = '#FBBF24'; // 黄色
+                emoji = '💪';
+            }
+            
+            // 确定运动类型文案
+            const activityName = sportType === 'DailySummary' ? '运动' : sportType;
+            
+            return {
+                text: `你已经 ${daysSince} 天没有${activityName}啦 ${emoji}`,
+                color,
+                emoji
+            };
+        };
+
+        // --- 2. 服务逻辑 (本地数据生成) ---
+        const QUOTES = {
+            high_calorie: ["能量爆棚！", "燃烧吧，卡路里！", "极限突破", "纯粹的力量", "重新定义极限"],
+            consistency: ["坚持就是胜利", "又赢了一天", "积少成多", "进步胜过完美", "自律即自由"],
+            generic: ["数据可视化你的努力", "让汗水变成艺术", "专注目标", "运动即生命", "每一步都算数"]
+        };
+
+        const PosterStyle = {
+            NATURE: 'Zen Nature'
+        };
+
+        const generatePosterInsight = (workouts) => {
+            const totalCals = workouts.reduce((sum, w) => sum + w.calories, 0);
+            let pool = QUOTES.generic;
+            if (totalCals > 2000) pool = [...pool, ...QUOTES.high_calorie];
+            if (workouts.length > 5) pool = [...pool, ...QUOTES.consistency];
+            
+            const randomQuote = pool[Math.floor(Math.random() * pool.length)];
+            return randomQuote;
+        };
+
+        // --- 3. 基础组件 ---
+        const Button = ({ children, variant = 'primary', className = '', onClick, ...props }) => {
+            const base = "px-4 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50";
+            const variants = {
+                primary: "bg-primary text-dark hover:bg-cyan-400 shadow-lg shadow-cyan-500/30",
+                secondary: "bg-secondary text-white hover:bg-rose-600 shadow-lg shadow-rose-500/30",
+                outline: "border-2 border-slate-600 text-slate-300 hover:border-primary hover:text-primary bg-transparent",
+                ghost: "bg-transparent text-slate-400 hover:text-white hover:bg-slate-800"
+            };
+            return (
+                <button onClick={onClick} className={`${base} ${variants[variant]} ${className}`} {...props}>
+                    {children}
+                </button>
+            );
+        };
+
+        // --- 4. 业务组件 ---
+        // 增加 workouts 属性接收，用于计算 ID 序号
+        const WorkoutForm = ({ onAddWorkout, workouts }) => {
+            const [type, setType] = useState('');
+            const [duration, setDuration] = useState('');
+            const [calories, setCalories] = useState('');
+            const [num, setNum] = useState(''); // 步数输入
+            const [notes, setNotes] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!type) return;
+
+                const today = new Date().toISOString().split('T')[0];
+                
+                // 计算当天序号 (ID 格式: YYYY-MM-DD-N)
+                const count = workouts.filter(w => w.date === today).length + 1;
+                const newId = `${today}-${count}`;
+
+                const newWorkout = {
+                    id: newId,
+                    type: type.trim(), 
+                    duration: parseInt(duration) || 0,
+                    calories: parseInt(calories) || 0,
+                    num: parseInt(num) || 0, // 保存步数
+                    date: today,
+                    notes
+                };
+                onAddWorkout(newWorkout);
+                setType(''); setDuration(''); setCalories(''); setNum(''); setNotes('');
+            };
+
+            return (
+                <div className="bg-card p-6 rounded-2xl shadow-xl border border-slate-800">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <Icon name="PlusCircle" className="text-primary" /> Log Workout
+                        </h2>
+                    </div>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-1">Exercise Type</label>
+                            <div className="relative">
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"><Icon name="Dumbbell" size={16} /></div>
+                                <input type="text" value={type} onChange={(e) => setType(e.target.value)} placeholder="e.g. 每日行走步数, Running" className="w-full bg-dark border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-primary transition-colors" required />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-400 mb-1">Duration</label>
+                                <div className="relative">
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"><Icon name="Clock" size={16} /></div>
+                                    <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="min" className="w-full bg-dark border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-primary transition-colors" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-400 mb-1">Calories</label>
+                                <div className="relative">
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"><Icon name="Flame" size={16} /></div>
+                                    <input type="number" value={calories} onChange={(e) => setCalories(e.target.value)} placeholder="kcal" className="w-full bg-dark border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-primary transition-colors" />
+                                </div>
+                            </div>
+                            {/* 步数输入框 */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-400 mb-1">Steps</label>
+                                <div className="relative">
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"><Icon name="Activity" size={16} /></div>
+                                    <input type="number" value={num} onChange={(e) => setNum(e.target.value)} placeholder="num" className="w-full bg-dark border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-primary transition-colors" />
+                                </div>
+                            </div>
+                        </div>
+                        <Button type="submit" className="w-full">Save Entry</Button>
+                    </form>
+                </div>
+            );
+        };
+
+        // --- 组件:JSON 编辑器 (含文件导入/导出功能) ---
+        const JsonEditor = ({ workouts, onUpdate }) => {
+            const [jsonText, setJsonText] = useState(JSON.stringify(workouts, null, 2));
+            const [error, setError] = useState(null);
+            const fileInputRef = useRef(null);
+            
+            // 用于存储文件夹句柄和降级提示状态
+            const directoryHandleRef = useRef(null);
+            const fallbackWarningShownRef = useRef(false);
+
+            // 同步数据
+            useEffect(() => {
+                setJsonText(JSON.stringify(workouts, null, 2));
+            }, [workouts]);
+
+            // 保存到 App 状态 (应用更改)
+            const handleApply = () => {
+                try {
+                    const parsed = JSON.parse(jsonText);
+                    if (!Array.isArray(parsed)) throw new Error("数据格式错误：根节点必须是数组 [...]");
+                    onUpdate(parsed);
+                    setError(null);
+                    alert("数据已更新到当前视图！");
+                } catch (err) {
+                    setError(err.message);
+                }
+            };
+
+            // 导出 JSON 文件 - 使用新的保存工具函数
+            const handleExport = async () => {
+                try {
+                    // 验证 JSON 格式
+                    JSON.parse(jsonText);
+                    
+                    // 使用新的文件保存工具
+                    await saveFileWithDialog(
+                        jsonText,
+                        'metadata.json',
+                        'application/json',
+                        directoryHandleRef,
+                        fallbackWarningShownRef
+                    );
+                } catch (err) {
+                    setError("导出失败：当前编辑器内容的 JSON 格式不正确");
+                }
+            };
+
+            // 导入 JSON 文件
+            const handleFileImport = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const content = e.target.result;
+                        const parsed = JSON.parse(content);
+                        if (!Array.isArray(parsed)) throw new Error("文件格式错误：JSON 内容必须是数组 [...]");
+                        
+                        onUpdate(parsed);
+                        setJsonText(JSON.stringify(parsed, null, 2));
+                        setError(null);
+                        alert(`成功导入 ${parsed.length} 条记录！`);
+                    } catch (err) {
+                        setError("导入失败: " + err.message);
+                        alert("导入失败，请检查文件。");
+                    }
+                    event.target.value = '';
+                };
+                reader.readAsText(file);
+            };
+
+            return (
+                <div className="bg-card p-6 rounded-2xl shadow-xl border border-slate-800 h-full flex flex-col">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <Icon name="Database" className="text-primary" /> JSON Data
+                        </h2>
+                        
+                        <div className="flex gap-2">
+                            <input type="file" ref={fileInputRef} onChange={handleFileImport} className="hidden" accept=".json" />
+                            
+                            {/* 导入按钮 */}
+                            <Button onClick={() => fileInputRef.current.click()} variant="outline" className="text-xs px-3 py-1" title="Import JSON">
+                                <Icon name="Upload" size={14} /> 导入
+                            </Button>
+
+                            {/* 导出按钮 - 文本从"备份"改为"导出" */}
+                            <Button onClick={handleExport} variant="outline" className="text-xs px-3 py-1" title="Export JSON">
+                                <Icon name="Save" size={14} /> 导出
+                            </Button>
+
+                            {/* 应用更改按钮 */}
+                            <Button onClick={handleApply} size="sm" className="text-xs px-3 py-1" title="Apply changes to view">
+                                应用
+                            </Button>
+                        </div>
+                    </div>
+                    
+                    {error && <div className="mb-2 text-red-400 text-xs bg-red-900/20 p-2 rounded">{error}</div>}
+                    
+                    <textarea
+                        className="flex-1 w-full bg-dark border border-slate-700 rounded-lg p-4 text-xs font-mono text-slate-300 focus:outline-none focus:border-primary resize-none leading-relaxed custom-scrollbar"
+                        value={jsonText}
+                        onChange={(e) => setJsonText(e.target.value)}
+                        spellCheck="false"
+                        placeholder="数据将显示在这里。您可以导入 .json 文件，或手动编辑后点击'应用'。"
+                    />
+                    <p className="text-slate-500 text-xs mt-2">推荐定期点击"导出"按钮，将数据保存为 .json 文件到本地。</p>
+                </div>
+            );
+        };
+
+        /**
+         * 组件：标语管理面板
+         * 提供多行文本编辑、约定格式校验（- 开头）、导入导出功能
+         */
+        const SloganManager = ({ slogans, onUpdate }) => {
+            const fileInputRef = useRef(null);
+            
+            // 用于存储文件夹句柄和降级提示状态
+            const directoryHandleRef = useRef(null);
+            const fallbackWarningShownRef = useRef(false);
+
+            // 导出标语为文本文件 - 使用新的保存工具函数
+            const handleExport = async () => {
+                await saveFileWithDialog(
+                    slogans,
+                    'slogans.txt',
+                    'text/plain',
+                    directoryHandleRef,
+                    fallbackWarningShownRef
+                );
+            };
+
+            // 从文本文件导入标语
+            const handleImport = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    const content = evt.target.result;
+                    onUpdate(content);
+                    alert("标语导入成功！");
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+            };
+
+            return (
+                <div className="bg-card p-6 rounded-2xl shadow-xl border border-slate-800 h-full flex flex-col">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <Icon name="Sparkles" className="text-primary" /> 励志标语管理
+                        </h2>
+                        <div className="flex gap-2">
+                            <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".txt" />
+                            <Button onClick={() => fileInputRef.current.click()} variant="outline" className="text-xs px-3 py-1">
+                                <Icon name="Upload" size={14} /> 导入
+                            </Button>
+                            <Button onClick={handleExport} variant="outline" className="text-xs px-3 py-1">
+                                <Icon name="Save" size={14} /> 导出
+                            </Button>
+                        </div>
+                    </div>
+                    
+                    <textarea
+                        className="flex-1 w-full bg-dark border border-slate-700 rounded-lg p-4 text-sm font-mono text-slate-300 focus:outline-none focus:border-primary resize-none leading-relaxed custom-scrollbar min-h-[200px]"
+                        value={slogans}
+                        onChange={(e) => onUpdate(e.target.value)}
+                        spellCheck="false"
+                        placeholder="- 坚持就是胜利&#10;- 每一滴汗水都是成功的基石..."
+                    />
+                    <div className="mt-2 space-y-1">
+                        <p className="text-slate-500 text-[11px]">约定：每行一条，必须以 "- " (横杠+空格) 开头。</p>
+                        <p className="text-primary/70 text-[11px]">系统将实时自动保存您的更改。</p>
+                    </div>
+                </div>
+            );
+        };
+
+        // 组件：迷你图表预览 (支持传入 color 属性以保持一致性)
+        const MiniChartPreview = ({ data, mode, metric, color: overrideColor, sportType }) => {
+            const canvasRef = useRef(null);
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas || !data || data.length === 0) return;
+
+                const ctx = canvas.getContext('2d');
+                const dpr = window.devicePixelRatio || 1;
+                
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                ctx.scale(dpr, dpr);
+
+                const W = rect.width;
+                const H = rect.height;
+                const padding = 10;
+                const drawW = W - padding * 2;
+                const drawH = H - padding * 2;
+
+                ctx.clearRect(0, 0, W, H);
+
+                // 优先使用传入的 overrideColor，否则使用默认逻辑
+                let drawColor = overrideColor;
+                if (!drawColor) {
+                    drawColor = '#00D4FF';
+                    if (metric === DataMetric.CALORIES) drawColor = '#FF0055';
+                    if (metric === DataMetric.STEPS) drawColor = '#10B981'; 
+                    if (metric === DataMetric.DISTANCE) drawColor = '#A855F7';
+                    if (metric === DataMetric.PACE) drawColor = '#F59E0B';
+                }
+                
+                // 准备数据
+                let values = [];
+                if (metric === DataMetric.PACE) {
+                    values = data.map(d => {
+                        const dist = d.distance || 0;
+                        const dur = d.duration || 0;
+                        return dist > 0 ? (dur / dist) : 0;
+                    });
+                } else {
+                    let metricKey = 'duration';
+                    if (metric === DataMetric.CALORIES) metricKey = 'calories';
+                    if (metric === DataMetric.STEPS) metricKey = 'num';
+                    if (metric === DataMetric.DISTANCE) metricKey = 'distance';
+                    values = data.map(d => d[metricKey] || 0);
+                }
+
+                const maxVal = Math.max(...values, 1) * 1.1;
+                
+                // 绘制纵坐标轴
+                // Y轴线
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(padding, padding);
+                ctx.lineTo(padding, H - padding);
+                ctx.stroke();
+
+                // Y轴刻度和标签（3个刻度点：0%, 50%, 100%）
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.font = '9px Inter';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+
+                const yTicks = [0, 0.5, 1]; // 对应 0%, 50%, 100%
+                yTicks.forEach(ratio => {
+                    const y = H - padding - (ratio * drawH);
+                    const value = Math.round(maxVal * ratio);
+                    
+                    // 刻度线
+                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(padding, y);
+                    ctx.lineTo(padding + 3, y);
+                    ctx.stroke();
+                    
+                    // 数值标签
+                    ctx.fillText(value.toString(), padding - 4, y);
+                });
+
+                ctx.strokeStyle = drawColor;
+                ctx.fillStyle = drawColor;
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                const stepX = drawW / (values.length - 1 || 1);
+
+                if (mode === ChartMode.BAR) {
+                    const barWidth = (drawW / values.length) * 0.6;
+                    values.forEach((val, i) => {
+                        const h = (val / maxVal) * drawH;
+                        const x = padding + (i * (drawW / values.length)) + (drawW / values.length - barWidth) / 2;
+                        const y = H - padding - h;
+                        ctx.beginPath();
+                        if (ctx.roundRect) ctx.roundRect(x, y, barWidth, h, [4, 4, 0, 0]);
+                        else ctx.rect(x, y, barWidth, h);
+                        ctx.fill();
+                    });
+                } else {
+                    ctx.beginPath();
+                    if (values.length === 1) {
+                        const val = values[0];
+                        const y = H - padding - ((val / maxVal) * drawH);
+                        ctx.moveTo(padding, y); ctx.lineTo(W - padding, y);
+                    } else {
+                        values.forEach((val, i) => {
+                            const x = padding + i * stepX;
+                            const y = H - padding - ((val / maxVal) * drawH);
+                            if (i === 0) ctx.moveTo(x, y);
+                            else {
+                                if (mode === ChartMode.CURVE) {
+                                    const prevVal = values[i - 1];
+                                    const prevX = padding + (i - 1) * stepX;
+                                    const prevY = H - padding - ((prevVal / maxVal) * drawH);
+                                    const midX = (prevX + x) / 2;
+                                    ctx.bezierCurveTo(midX, prevY, midX, y, x, y);
+                                } else { ctx.lineTo(x, y); }
+                            }
+                        });
+                    }
+                    ctx.shadowColor = drawColor; ctx.shadowBlur = 10; ctx.stroke(); ctx.shadowBlur = 0;
+                    ctx.fillStyle = '#1E293B'; ctx.lineWidth = 2;
+                    values.forEach((val, i) => {
+                        const x = padding + i * stepX;
+                        const y = H - padding - ((val / maxVal) * drawH);
+                        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                    });
+                }
+            }, [data, mode, metric, overrideColor]);
+
+            // 计算提醒信息
+            const daysSince = calculateDaysSinceLastWorkout(data);
+            const reminderConfig = getReminderConfig(daysSince, sportType || 'preview', data?.length || 0);
+            
+            return (
+                <div className="relative">
+                    <canvas ref={canvasRef} className="w-full h-32 rounded-lg bg-dark/50 border border-slate-700/50" />
+                    {reminderConfig && (
+                        <div 
+                            className="text-center text-xs mt-1.5 font-medium"
+                            style={{ color: reminderConfig.color }}
+                        >
+                            {reminderConfig.text}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // DataOverviewPanel：增加目标日期输入
+        const DataOverviewPanel = ({ workouts, goals, onGoalsChange }) => {
+            const stats = {
+                count: workouts.length,
+                totalDuration: workouts.reduce((sum, w) => sum + (w.duration || 0), 0),
+                totalCalories: workouts.reduce((sum, w) => sum + (w.calories || 0), 0),
+                totalSteps: workouts.reduce((sum, w) => sum + (w.num || 0), 0),
+                totalDistance: workouts.reduce((sum, w) => sum + (w.distance || 0), 0).toFixed(2),
+                avgDuration: workouts.length ? Math.round(workouts.reduce((sum, w) => sum + (w.duration || 0), 0) / workouts.length) : 0
+            };
+
+            return (
+                <div className="bg-card p-6 rounded-2xl shadow-xl border border-slate-800 h-full">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-6">
+                        <Icon name="Activity" className="text-primary" /> 数据概览
+                    </h2>
+
+                    <div className="mb-6 p-4 bg-dark/30 rounded-xl border border-dashed border-slate-700 space-y-3">
+                        <div>
+                            <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">一级大目标 (Major Goal)</label>
+                            <input 
+                                type="text" 
+                                value={goals?.title || ""} 
+                                onChange={(e) => onGoalsChange({...goals, title: e.target.value})}
+                                className="w-full bg-dark border border-slate-600 rounded px-3 py-1.5 text-white font-bold focus:border-primary focus:outline-none transition-colors"
+                                placeholder="例如：2025 健身计划"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">二级小目标 (Subtitle)</label>
+                            <input 
+                                type="text" 
+                                value={goals?.subtitle || ""} 
+                                onChange={(e) => onGoalsChange({...goals, subtitle: e.target.value})}
+                                className="w-full bg-dark border border-slate-600 rounded px-3 py-1.5 text-sm text-slate-300 focus:border-primary focus:outline-none transition-colors"
+                                placeholder="例如：自律即自由"
+                            />
+                        </div>
+                        {/* 倒计时日期输入 */}
+                        <div>
+                            <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">目标倒计时日期 (Target Date)</label>
+                            <div className="relative">
+                                <input 
+                                    type="date" 
+                                    value={goals?.targetDate || ""} 
+                                    onChange={(e) => onGoalsChange({...goals, targetDate: e.target.value})}
+                                    className="w-full bg-dark border border-slate-600 rounded px-3 py-1.5 text-sm text-white focus:border-primary focus:outline-none transition-colors"
+                                />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                                    <Icon name="Clock" size={14} />
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-1">设置后将在壁纸上显示倒计时天数。</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-dark/50 p-4 rounded-xl border border-slate-700">
+                            <div className="text-slate-400 text-xs mb-1">累计运动</div>
+                            <div className="text-2xl font-bold text-white">{stats.count} <span className="text-sm font-normal text-slate-500">次</span></div>
+                        </div>
+                        <div className="bg-dark/50 p-4 rounded-xl border border-slate-700">
+                            <div className="text-slate-400 text-xs mb-1">累计时长</div>
+                            <div className="text-2xl font-bold text-primary">{stats.totalDuration} <span className="text-sm font-normal text-slate-500">min</span></div>
+                        </div>
+                        <div className="bg-dark/50 p-4 rounded-xl border border-slate-700">
+                            <div className="text-slate-400 text-xs mb-1">消耗热量</div>
+                            <div className="text-2xl font-bold text-secondary">{stats.totalCalories.toLocaleString()} <span className="text-sm font-normal text-slate-500">kcal</span></div>
+                        </div>
+                        <div className="bg-dark/50 p-4 rounded-xl border border-slate-700">
+                            <div className="text-slate-400 text-xs mb-1">累计跑量</div>
+                            <div className="text-2xl font-bold text-purple-400">{stats.totalDistance} <span className="text-sm font-normal text-slate-500">km</span></div>
+                        </div>
+                        <div className="bg-dark/50 p-4 rounded-xl border border-slate-700">
+                            <div className="text-slate-400 text-xs mb-1">累计步数</div>
+                            <div className="text-2xl font-bold text-emerald-400">{stats.totalSteps.toLocaleString()} <span className="text-sm font-normal text-slate-500">steps</span></div>
+                        </div>
+                        <div className="bg-dark/50 p-4 rounded-xl border border-slate-700">
+                            <div className="text-slate-400 text-xs mb-1">平均时长</div>
+                            <div className="text-2xl font-bold text-white">{stats.avgDuration} <span className="text-sm font-normal text-slate-500">min</span></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const VisualConfigPanel = ({ workouts, sportConfigs, onConfigChange, visualSettings, chartDataDays, onChartDataDaysChange }) => {
+            const [dragInfo, setDragInfo] = useState({ type: null, sourceRow: null });
+            const [dropTarget, setDropTarget] = useState({ row: null, index: null });
+
+            const SPECIAL_TYPE_ID = 'DailySummary';
+            const rawUniqueTypes = [...new Set(workouts.map(w => w.type))].filter(t => t !== 'Swimming' && t !== '游泳').sort();
+            const allTypes = (workouts.length > 0) ? [SPECIAL_TYPE_ID, ...rawUniqueTypes] : [];
+
+            // 根据当前配置将类型分配到两行
+            const getRowsData = () => {
+                const rows = { 1: [], 2: [] };
+                allTypes.forEach(type => {
+                    const config = sportConfigs[type] || {};
+                    const r = config.row === 2 ? 2 : 1;
+                    rows[r].push({ type, col: config.col || 99 });
+                });
+                rows[1].sort((a, b) => a.col - b.col);
+                rows[2].sort((a, b) => a.col - b.col);
+                return rows;
+            };
+
+            const rowsData = getRowsData();
+
+            // 核心：处理排版更新逻辑（原子化更新，解决跳回Bug）
+            const finalizeReorder = (type, targetRow, targetIndex) => {
+                const newRows = { 1: rowsData[1].map(d => d.type), 2: rowsData[2].map(d => d.type) };
+                
+                // 从原位置移除
+                newRows[1] = newRows[1].filter(t => t !== type);
+                newRows[2] = newRows[2].filter(t => t !== type);
+                
+                // 插入新位置
+                newRows[targetRow].splice(targetIndex, 0, type);
+
+                // 重新计算所有受影响类型的 row 和 col
+                const updatedConfigs = { ...sportConfigs };
+                [1, 2].forEach(r => {
+                    newRows[r].forEach((t, idx) => {
+                        updatedConfigs[t] = { 
+                            ...(updatedConfigs[t] || { mode: 'Curve', metric: 'Duration' }), 
+                            row: r, 
+                            col: idx + 1 
+                        };
+                    });
+                });
+                
+                onConfigChange(updatedConfigs);
+                setDragInfo({ type: null, sourceRow: null });
+                setDropTarget({ row: null, index: null });
+            };
+
+            const handleDragStart = (type, sourceRow) => {
+                setDragInfo({ type, sourceRow });
+            };
+
+            const handleDragOver = (e, row, index) => {
+                e.preventDefault();
+                // 禁止落入逻辑：行满3个且不是来自本行
+                if (rowsData[row].length >= 3 && dragInfo.sourceRow !== row) {
+                    return;
+                }
+                setDropTarget({ row, index });
+            };
+
+            const updateSingleConfig = (type, key, value) => {
+                onConfigChange({
+                    ...sportConfigs,
+                    [type]: { ...(sportConfigs[type] || { mode: 'Curve', metric: 'Duration', row: 1, col: 1 }), [key]: value }
+                });
+            };
+
+            return (
+                <div className="bg-card p-6 rounded-2xl shadow-xl border border-slate-800 w-full">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-6">
+                        <Icon name="Palette" className="text-secondary" /> 布局与视觉配置
+                    </h2>
+
+                    {/* 全局天数设置 */}
+                    <div className="mb-8 p-4 bg-primary/5 border border-primary/20 rounded-xl flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <Icon name="BarChart3" className="text-primary" />
+                            <span className="text-sm font-bold">图表展示天数</span>
+                        </div>
+                        <input type="number" value={chartDataDays} onChange={(e) => onChartDataDaysChange(parseInt(e.target.value))} className="w-20 bg-dark border border-slate-600 rounded px-2 py-1 text-center" />
+                    </div>
+
+                    {/* 拖拽行容器 */}
+                    <div className="space-y-12">
+                        {[1, 2].forEach && [1, 2].map(rowNum => (
+                            <div key={rowNum} className="relative">
+                                <div className="absolute -top-6 left-0 text-[10px] font-bold text-slate-500 uppercase tracking-widest">ROW {rowNum} (最多3个)</div>
+                                <div 
+                                    onDragOver={(e) => handleDragOver(e, rowNum, rowsData[rowNum].length)}
+                                    onDrop={() => dropTarget.row && finalizeReorder(dragInfo.type, dropTarget.row, dropTarget.index)}
+                                    className={`min-h-[220px] p-4 rounded-2xl border-2 border-dashed transition-all flex flex-wrap justify-center gap-6 ${dropTarget.row === rowNum ? 'border-primary bg-primary/5' : 'border-slate-800 bg-dark/20'}`}
+                                >
+                                    {rowsData[rowNum].map((item, idx) => (
+                                        <React.Fragment key={item.type}>
+                                            {/* 实时占位符 */}
+                                            {dropTarget.row === rowNum && dropTarget.index === idx && dragInfo.type !== item.type && (
+                                                <div className="w-72 h-48 border-2 border-dashed border-primary/30 rounded-2xl bg-primary/5 animate-pulse" />
+                                            )}
+                                            
+                                            <div 
+                                                draggable="false"
+                                                onDragOver={(e) => { e.stopPropagation(); handleDragOver(e, rowNum, idx); }}
+                                                className={`w-72 bg-dark/60 border border-slate-700 p-4 rounded-2xl relative group ${dragInfo.type === item.type ? 'opacity-40 scale-95' : 'opacity-100'}`}
+                                            >
+                                                {/* 拖拽手柄 */}
+                                                <div 
+                                                    draggable 
+                                                    onDragStart={() => handleDragStart(item.type, rowNum)}
+                                                    className="absolute top-4 left-4 cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-white transition-colors"
+                                                >
+                                                    <Icon name="GripVertical" size={18} />
+                                                </div>
+
+                                                <div className="text-center mb-4 mt-1 font-bold text-sm text-slate-300">
+                                                    {item.type === SPECIAL_TYPE_ID ? "每日运动统计" : item.type}
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    {/* 颜色 */}
+                                                    <div className="flex gap-2 items-center">
+                                                        <input type="color" value={sportConfigs[item.type]?.customColor || '#4ade80'} onChange={(e) => updateSingleConfig(item.type, 'customColor', e.target.value)} className="w-8 h-8 rounded bg-transparent cursor-pointer" />
+                                                        <div className="flex-1 bg-dark/50 px-2 py-1 rounded text-[10px] font-mono text-slate-400">
+                                                            {sportConfigs[item.type]?.customColor || '默认颜色'}
+                                                        </div>
+                                                    </div>
+                                                    {/* 类型与指标简选 */}
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <select value={sportConfigs[item.type]?.mode || 'Curve'} onChange={(e) => updateSingleConfig(item.type, 'mode', e.target.value)} className="bg-dark border border-slate-700 rounded px-1 py-1 text-[10px] text-slate-300">
+                                                            <option value="Curve">曲线</option><option value="Line">折线</option><option value="Bar">柱状</option>
+                                                        </select>
+                                                        <select value={sportConfigs[item.type]?.metric || 'Duration'} onChange={(e) => updateSingleConfig(item.type, 'metric', e.target.value)} className="bg-dark border border-slate-700 rounded px-1 py-1 text-[10px] text-slate-300">
+                                                            <option value="Duration">时长</option><option value="Calories">热量</option><option value="Steps">步数</option><option value="Distance">距离</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </React.Fragment>
+                                    ))}
+                                    {/* 尾部占位符 */}
+                                    {dropTarget.row === rowNum && dropTarget.index === rowsData[rowNum].length && (
+                                        <div className="w-72 h-48 border-2 border-dashed border-primary/30 rounded-2xl bg-primary/5 animate-pulse" />
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+
+        const WorkoutHistory = ({ workouts, onSelect, selectedId }) => {
+            if (workouts.length === 0) return <div className="text-center py-10 text-slate-500"><p>No workouts recorded yet.</p></div>;
+            
+            // 添加排序逻辑
+            const sortedWorkouts = [...workouts].sort(sortByDate);
+            
+            return (
+                <div className="space-y-3">
+                    {sortedWorkouts.map((w) => (
+                        <div key={w.id} onClick={() => onSelect(w)} className={`p-4 rounded-xl border cursor-pointer transition-all hover:translate-x-1 ${selectedId === w.id ? 'bg-slate-800 border-primary' : 'bg-dark border-slate-800 hover:border-slate-600'}`}>
+                            <div className="flex justify-between items-start mb-2">
+                                <h3 className="font-bold text-white">{w.type}</h3>
+                                <span className="text-xs text-slate-400 bg-slate-900 px-2 py-1 rounded">{new Date(w.date).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex gap-4 text-xs text-slate-400">
+                                <div className="flex items-center gap-1"><Icon name="Clock" size={12} /> {w.duration}m</div>
+                                <div className="flex items-center gap-1"><Icon name="Flame" size={12} /> {w.calories} kcal</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        /**
+         * 裁剪组件：提供 16:9 比例的半透明裁剪框
+         * 支持在图片范围内移动裁剪框
+         */
+        const ImageCropModal = ({ src, onConfirm, onCancel }) => {
+            const [imgMeta, setImgMeta] = useState({ width: 0, height: 0, displayWidth: 0, displayHeight: 0 });
+            const [crop, setCrop] = useState({ x: 0, y: 0, width: 0, height: 0 }); // 这里的数值是基于显示尺寸的 px
+            const containerRef = useRef(null);
+            const isDragging = useRef(false);
+            const startPos = useRef({ x: 0, y: 0 });
+
+            const ASPECT_RATIO = 3840 / 2160; // 16:9
+
+            const handleImageLoad = (e) => {
+                const { naturalWidth, naturalHeight, clientWidth, clientHeight } = e.target;
+                setImgMeta({ width: naturalWidth, height: naturalHeight, displayWidth: clientWidth, displayHeight: clientHeight });
+                
+                // 初始化裁剪框：计算最大可能的 16:9 区域
+                let cw, ch;
+                if (clientWidth / clientHeight > ASPECT_RATIO) {
+                    ch = clientHeight;
+                    cw = ch * ASPECT_RATIO;
+                } else {
+                    cw = clientWidth;
+                    ch = cw / ASPECT_RATIO;
+                }
+                setCrop({ x: (clientWidth - cw) / 2, y: (clientHeight - ch) / 2, width: cw, height: ch });
+            };
+
+            const handleMouseDown = (e) => {
+                isDragging.current = true;
+                startPos.current = { x: e.clientX - crop.x, y: e.clientY - crop.y };
+            };
+
+            const handleMouseMove = (e) => {
+                if (!isDragging.current) return;
+                let nx = e.clientX - startPos.current.x;
+                let ny = e.clientY - startPos.current.y;
+
+                // 边界检查
+                nx = Math.max(0, Math.min(nx, imgMeta.displayWidth - crop.width));
+                ny = Math.max(0, Math.min(ny, imgMeta.displayHeight - crop.height));
+
+                setCrop(prev => ({ ...prev, x: nx, y: ny }));
+            };
+
+            const handleMouseUp = () => { isDragging.current = false; };
+
+            const handleConfirm = () => {
+                // 将显示尺寸的坐标转换为原始图片的像素坐标
+                const scale = imgMeta.width / imgMeta.displayWidth;
+                onConfirm({
+                    x: crop.x * scale,
+                    y: crop.y * scale,
+                    width: crop.width * scale,
+                    height: crop.height * scale
+                });
+            };
+
+            return (
+                <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
+                    <div className="bg-card max-w-4xl w-full rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+                            <h3 className="text-lg font-bold">调整背景截取区域</h3>
+                            <div className="flex gap-2">
+                                <Button variant="ghost" onClick={onCancel}>取消</Button>
+                                <Button onClick={handleConfirm}>应用裁剪</Button>
+                            </div>
+                        </div>
+                        <div className="flex-1 bg-dark relative overflow-hidden flex items-center justify-center p-8 select-none" ref={containerRef}>
+                            <div className="relative inline-block">
+                                <img 
+                                    src={src} 
+                                    onLoad={handleImageLoad} 
+                                    className="max-w-full max-h-[60vh] object-contain pointer-events-none shadow-lg" 
+                                    draggable="false"
+                                />
+                                {/* 半透明遮罩层 - 使用 SVG 绘制空洞效果 */}
+                                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                                    <div className="absolute inset-0 bg-black/60"></div>
+                                    <div 
+                                        className="absolute border-2 border-primary shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] cursor-move pointer-events-auto flex items-center justify-center"
+                                        style={{ left: crop.x, top: crop.y, width: crop.width, height: crop.height }}
+                                        onMouseDown={handleMouseDown}
+                                    >
+                                        <div className="text-[10px] text-primary font-bold bg-dark/80 px-1 rounded">16:9 壁纸区域</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-slate-900 text-slate-400 text-xs text-center">
+                            提示：拖动高亮区域选择您希望在壁纸背景中显示的图片部分。
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const PosterGenerator = ({ workouts, goals, visualSettings, sportConfigs, onVisualSettingsChange, slogans, chartDataDays }) => {
+            // 解析标语库
+            const getSloganPool = () => {
+                const pool = slogans.split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line.startsWith('- '))
+                    .map(line => line.substring(2).trim())
+                    .filter(line => line.length > 0);
+                return pool.length > 0 ? pool : ["专注目标，每一步都算数"];
+            };
+
+            const [insight, setInsight] = useState(() => {
+                const pool = getSloganPool();
+                return pool[Math.floor(Math.random() * pool.length)];
+            });
+
+            const [userImage, setUserImage] = useState(null); 
+            const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+            const { style, imageSize = 300, imageShape = 'circle', bgOpacity = 0.15 } = visualSettings;
+            
+            const canvasRef = useRef(null);
+            const fileInputRef = useRef(null); 
+
+            useEffect(() => {
+                const savedImage = localStorage.getItem('fitposter_user_image');
+                if (savedImage) setUserImage(savedImage);
+            }, []);
+
+            useEffect(() => {
+                if (userImage) {
+                    try { localStorage.setItem('fitposter_user_image', userImage); } 
+                    catch (e) { console.warn("图片太大，无法保存", e); }
+                } else { localStorage.removeItem('fitposter_user_image'); }
+            }, [userImage]);
+
+            const stats = {
+                totalWorkouts: workouts.length,
+                totalCalories: workouts.reduce((acc, curr) => acc + (curr.calories || 0), 0),
+                totalDuration: workouts.reduce((acc, curr) => acc + (curr.duration || 0), 0),
+                totalSteps: workouts.reduce((acc, curr) => acc + (curr.num || 0), 0),
+                totalDistance: workouts.reduce((acc, curr) => acc + (curr.distance || 0), 0).toFixed(1), 
+            };
+
+            // 刷新时随机抽取标语
+            const handleRefresh = () => {
+                const pool = getSloganPool();
+                setInsight(pool[Math.floor(Math.random() * pool.length)]);
+            };
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        setUserImage(evt.target.result);
+                        onVisualSettingsChange({ ...visualSettings, bgCrop: null });
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const handleCropConfirm = (cropParams) => {
+                onVisualSettingsChange({ ...visualSettings, bgCrop: cropParams });
+                setIsCropModalOpen(false);
+            };
+
+            useEffect(() => {
+                if (!canvasRef.current || workouts.length === 0) return;
+                
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                canvas.width = 3840; canvas.height = 2160;
+                const W = canvas.width; const H = canvas.height;
+
+                // 计算本周一的日期字符串
+                const renderFrame = (imgObj) => {
+                    ctx.clearRect(0, 0, W, H);
+
+                    // 计算并标准化本周一日期对象
+                    const now = new Date();
+                    const day = now.getDay(); // 0 (Sun) to 6 (Sat)
+                    // 计算本周一。如果是周日(0)，减去6天；否则减去 (day-1) 天
+                    const mondayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (day === 0 ? 6 : day - 1));
+                    mondayDate.setHours(0, 0, 0, 0); // 关键：时间归零以支持日期比较
+
+                    if (visualSettings.useImageAsBackground && imgObj) {
+                        ctx.save();
+                        ctx.fillStyle = '#0F172A'; ctx.fillRect(0, 0, W, H);
+                        ctx.filter = `blur(${visualSettings.bgBlur ?? 60}px)`;
+
+                        if (visualSettings.bgCrop) {
+                            const { x, y, width, height } = visualSettings.bgCrop;
+                            ctx.drawImage(imgObj, x, y, width, height, 0, 0, W, H);
+                        } else {
+                            const imgRatio = imgObj.width / imgObj.height;
+                            const canvasRatio = W / H;
+                            let drawW, drawH, drawX, drawY;
+                            if (imgRatio > canvasRatio) {
+                                drawH = H; drawW = H * imgRatio; drawY = 0; drawX = (W - drawW) / 2;
+                            } else {
+                                drawW = W; drawH = W / imgRatio; drawX = 0; drawY = (H - drawH) / 2;
+                            }
+                            const scale = 1.1;
+                            ctx.drawImage(imgObj, drawX - (drawW*(scale-1))/2, drawY - (drawH*(scale-1))/2, drawW * scale, drawH * scale);
+                        }
+                        ctx.restore();
+                        ctx.fillStyle = `rgba(15, 23, 42, 0.8)`; 
+                        ctx.fillRect(0, 0, W, H);
+                    } else {
+                        const grad = ctx.createLinearGradient(0, 0, 0, H);
+                        grad.addColorStop(0, '#022c22'); 
+                        grad.addColorStop(1, '#064e3b');
+                        ctx.fillStyle = grad; 
+                        ctx.fillRect(0, 0, W, H);
+                        for(let i=0; i<20; i++) {
+                            ctx.beginPath(); 
+                            ctx.arc(Math.random() * W, Math.random() * H, Math.random() * 300 + 50, 0, Math.PI*2);
+                            ctx.fillStyle = `rgba(34, 197, 94, ${Math.random() * 0.1})`; 
+                            ctx.fill();
+                        }
+                        const g = ctx.createLinearGradient(0, 0, 0, H);
+                        g.addColorStop(0, "rgba(15, 23, 42, 0.2)"); g.addColorStop(1, "rgba(15, 23, 42, 0.9)");
+                        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+                    }
+
+                    let mainColor = '#4ade80'; let secColor = '#facc15'; let textColor = 'rgba(255,255,255,0.8)';
+
+                    const statsOriginX = 300;
+                    const statsOriginY = 160;
+                    const colGap = 400; 
+                    const rowGap = 160; 
+
+                    ctx.textAlign = "left";
+                    const drawGridStat = (label, val, col, row) => {
+                        const x = statsOriginX + col * colGap;
+                        const y = statsOriginY + row * rowGap;
+                        ctx.font = "bold 28px Inter"; 
+                        ctx.fillStyle = "rgba(255,255,255,0.4)"; 
+                        ctx.fillText(label, x, y);
+                        ctx.font = "bold 70px Inter"; 
+                        ctx.fillStyle = "#ffffff"; 
+                        ctx.fillText(val, x, y + 70);
+                    };
+
+                    drawGridStat("总运动次数", `${stats.totalWorkouts}`, 0, 0);
+                    drawGridStat("总步数", `${stats.totalSteps.toLocaleString()}`, 1, 0);
+                    drawGridStat("跑步里程 (km)", `${stats.totalDistance}`, 0, 1);
+                    drawGridStat("运动时长 (min)", `${stats.totalDuration}`, 1, 1);
+
+                    ctx.textAlign = "center";
+                    const centerX = W / 2 + 100; 
+                    ctx.font = "bold 70px Inter"; 
+                    ctx.fillStyle = "#ffffff";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "alphabetic";
+                    ctx.fillText(goals?.title || "", centerX, 180);
+
+                    const subRowY = 280;    
+                    const subGap = 30;      
+                    let subRowWidth = 0;
+                    let bLabel = "";
+                    let bW = 0;
+                    const subTitleStr = goals?.subtitle || "";
+
+                    if (goals?.targetDate) {
+                        const diff = Math.ceil((new Date(goals.targetDate) - new Date()) / (1000 * 60 * 60 * 24));
+                        if (!isNaN(diff)) {
+                            bLabel = diff >= 0 ? `${diff} DAYS LEFT` : `${Math.abs(diff)} DAYS SINCE`;
+                            ctx.font = "bold 30px Inter";
+                            bW = ctx.measureText(bLabel).width + 40;
+                            subRowWidth += bW;
+                        }
+                    }
+
+                    let sW = 0;
+                    if (subTitleStr) {
+                        ctx.font = "500 50px Inter";
+                        sW = ctx.measureText(subTitleStr).width;
+                        subRowWidth += (subRowWidth > 0 ? subGap : 0) + sW;
+                    }
+
+                    let drawX = centerX - subRowWidth / 2;
+
+                    if (bLabel) {
+                        const bH = 50;
+                        const bRectY = subRowY - bH / 2;
+                        ctx.beginPath();
+                        ctx.roundRect(drawX, bRectY, bW, bH, 25);
+                        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                        ctx.fill();
+                        ctx.strokeStyle = mainColor;
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.fillStyle = mainColor;
+                        ctx.font = "bold 30px Inter";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText(bLabel, drawX + bW / 2, subRowY + 2);
+                        drawX += bW + subGap;
+                    }
+
+                    if (subTitleStr) {
+                        ctx.font = "500 50px Inter";
+                        ctx.fillStyle = textColor;
+                        ctx.textAlign = "left";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText(subTitleStr, drawX, subRowY);
+                    }
+
+                    if (insight) {
+                        ctx.font = "italic 400 40px Inter"; 
+                        ctx.fillStyle = "rgba(255,255,255,0.7)";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "alphabetic";
+                        ctx.fillText(`“ ${insight} ”`, centerX, 400); 
+                    }
+
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "alphabetic";
+
+                    if (imgObj) {
+                        const size = imageSize; 
+                        const margin = 120;
+                        const x = W - size - margin;
+                        const y = margin;
+                        ctx.save();
+                        ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 20; ctx.shadowOffsetY = 10;
+                        if (imageShape === 'circle') {
+                            ctx.beginPath(); ctx.arc(x + size/2, y + size/2, size/2, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+                            ctx.drawImage(imgObj, x, y, size, size);
+                            ctx.restore(); 
+                            ctx.beginPath(); ctx.arc(x + size/2, y + size/2, size/2, 0, Math.PI * 2);
+                            ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.stroke();
+                        } else {
+                            const aspectRatio = imgObj.width / imgObj.height;
+                            const drawW = size; const drawH = size / aspectRatio;
+                            ctx.drawImage(imgObj, x, y, drawW, drawH);
+                            ctx.restore(); 
+                            ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.strokeRect(x, y, drawW, drawH);
+                        }
+                    }
+
+                    const chartAreaTop = 560; const chartAreaBottom = 2060;
+                    const chartTotalHeight = chartAreaBottom - chartAreaTop;
+                    const GRID_ROWS = 2; const maxColsInLayout = 3; const sideMargin = 150;
+                    const gapX = 150; const gapY = 100;
+                    const cellWidth = (W - sideMargin * 2 - (gapX * (maxColsInLayout - 1))) / maxColsInLayout;
+                    const cellHeight = (chartTotalHeight - (gapY * (GRID_ROWS - 1))) / GRID_ROWS;
+
+                    const workoutsByType = {};
+                    workouts.forEach(w => {
+                        if (!workoutsByType[w.type]) workoutsByType[w.type] = [];
+                        workoutsByType[w.type].push(w);
+                    });
+                    
+                    const SPECIAL_TYPE_ID = 'DailySummary';
+                    const dailyMap = {};
+                    workouts.forEach(w => {
+                        let dateStr = w.date;
+                        if (!dateStr && w.id && typeof w.id === 'string') {
+                            const parts = w.id.split('-');
+                            if (parts.length >= 3) { dateStr = `${parts[0]}-${parts[1]}-${parts[2]}`; }
+                        }
+                        if (dateStr) {
+                            if (!dailyMap[dateStr]) dailyMap[dateStr] = { date: dateStr, duration: 0, calories: 0, num: 0, distance: 0, id: `${dateStr}-sum` };
+                            dailyMap[dateStr].duration += Number(w.duration || 0);
+                            dailyMap[dateStr].calories += Number(w.calories || 0);
+                            dailyMap[dateStr].num += Number(w.num || 0);
+                            dailyMap[dateStr].distance += Number(w.distance || 0);
+                        }
+                    });
+                    const dailyDataArray = Object.values(dailyMap).sort(sortByDate);
+
+                    const rawUniqueTypes = Object.keys(workoutsByType).filter(type => type !== 'Swimming' && type !== '游泳');
+                    const allTypesToDraw = [SPECIAL_TYPE_ID, ...rawUniqueTypes];
+                    const chartColorPalette = [mainColor, secColor, '#22d3ee', '#a78bfa', '#f472b6', '#34d399'];
+
+                    const chartObjects = allTypesToDraw.map(type => {
+                        const config = sportConfigs[type] || {};
+                        let row = config.row || 1;
+                        if(row < 1) row = 1; if(row > 2) row = 2;
+                        return { type, row, col: config.col || 1 };
+                    });
+
+                    const rowData = { 1: [], 2: [] };
+                    chartObjects.forEach(obj => rowData[obj.row].push(obj));
+
+                    [1, 2].forEach(rowIndex => {
+                        const chartsInRow = rowData[rowIndex];
+                        if (chartsInRow.length === 0) return;
+                        chartsInRow.sort((a, b) => a.col - b.col);
+                        const rowContentWidth = chartsInRow.length * cellWidth + (chartsInRow.length - 1) * gapX;
+                        const rowStartX = (W - rowContentWidth) / 2;
+                        const currentChartY = chartAreaTop + (rowIndex - 1) * (cellHeight + gapY);
+                        const chartTitleAreaH = 120;
+                        const chartDrawH = cellHeight - chartTitleAreaH - 40;
+                        const chartPlotY = currentChartY + chartTitleAreaH;
+
+                        chartsInRow.forEach((chartObj, i) => {
+                            const type = chartObj.type;
+                            const currentChartX = rowStartX + i * (cellWidth + gapX);
+                            // 准备数据：typeData 用于显示，fullTypeData 用于判断记录数
+                            let fullTypeData, typeData;
+                            if (type === SPECIAL_TYPE_ID) {
+                                fullTypeData = dailyDataArray;
+                                typeData = dailyDataArray.slice(-chartDataDays);
+                            } else {
+                                fullTypeData = workoutsByType[type].sort(sortByDate);
+                                typeData = fullTypeData.slice(-chartDataDays);
+                            }
+
+                            const metricConfig = sportConfigs[type] || { mode: ChartMode.CURVE, metric: DataMetric.DURATION };
+                            let metricKey = 'duration';
+                            if (metricConfig.metric === DataMetric.CALORIES) metricKey = 'calories';
+                            if (metricConfig.metric === DataMetric.STEPS) metricKey = 'num';
+                            if (metricConfig.metric === DataMetric.DISTANCE) metricKey = 'distance';
+                            
+                            const currentColor = metricConfig.customColor || chartColorPalette[((rowIndex - 1) * 3 + i) % chartColorPalette.length];
+
+                            // 绘制标题
+                            ctx.fillStyle = textColor; ctx.font = "bold 40px Inter"; ctx.textAlign = "center";
+                            const sportMap = { 'Badminton': '打羽毛球', 'Running': '跑步', 'Swimming': '游泳', 'Cycling': '骑行', 'Walking': '徒步', 'Gym': '健身', 'HIIT': '高强度间歇', 'Pilates': '普拉提', [SPECIAL_TYPE_ID]: '每日运动' };
+                            ctx.fillText(sportMap[type] || type, currentChartX + cellWidth / 2, currentChartY + chartTitleAreaH / 2 - 15);
+                            
+                            // 绘制副标题
+                            ctx.font = "400 24px Inter"; ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                            let subLabel = metricConfig.metric === DataMetric.CALORIES ? '热量消耗' : (metricConfig.metric === DataMetric.STEPS ? '行走步数' : (metricConfig.metric === DataMetric.DISTANCE ? '运动距离 (km)' : '运动时长'));
+                            ctx.fillText(`(${subLabel})`, currentChartX + cellWidth / 2, currentChartY + chartTitleAreaH / 2 + 25);
+                            
+                            // 计算并绘制提醒文案（使用完整数据长度判断记录数）
+                            const daysSince = calculateDaysSinceLastWorkout(typeData);
+                            const recordCount = fullTypeData.length; // 使用完整数据长度
+                            const reminderConfig = getReminderConfig(daysSince, type, recordCount);
+                            
+                            if (reminderConfig) {
+                                ctx.font = "600 22px Inter";
+                                ctx.fillStyle = reminderConfig.color;
+                                ctx.textAlign = "center";
+                                ctx.fillText(reminderConfig.text, currentChartX + cellWidth / 2, currentChartY + chartTitleAreaH / 2 + 60);
+                            }
+
+                            ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2;
+                            ctx.beginPath(); ctx.moveTo(currentChartX, chartPlotY + chartDrawH); ctx.lineTo(currentChartX + cellWidth, chartPlotY + chartDrawH); ctx.stroke();
+
+                            let rawMax = Math.max(...typeData.map(w => w[metricKey] || 0));
+                            if (metricKey === 'num') rawMax = Math.max(rawMax, 10000);
+                            const maxVal = rawMax * 1.2 || 60; 
+                            const stepX = cellWidth / (typeData.length || 1);
+
+                            // 绘制基础纵坐标轴线
+                            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                            ctx.lineWidth = 3;
+                            ctx.beginPath();
+                            ctx.moveTo(currentChartX, chartPlotY);
+                            ctx.lineTo(currentChartX, chartPlotY + chartDrawH);
+                            ctx.stroke();
+
+                            // 1. 绘制水平参考线 (仅限步数指标)
+                            if (metricKey === 'num') {
+                                const fullHistoryData = (type === SPECIAL_TYPE_ID) ? dailyDataArray : (workoutsByType[type] || []);
+                                const allTimeAvg = fullHistoryData.length > 0 
+                                    ? Math.round(fullHistoryData.reduce((sum, w) => sum + (w.num || 0), 0) / fullHistoryData.length) 
+                                    : 0;
+
+                                ctx.save();
+                                ctx.setLineDash([15, 12]);
+                                ctx.lineWidth = 2;
+                                ctx.textAlign = "right";
+                                ctx.font = "bold 20px Inter";
+
+                                const y10k = chartPlotY + chartDrawH - ((10000 / maxVal) * chartDrawH);
+                                ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+                                ctx.beginPath();
+                                ctx.moveTo(currentChartX, y10k); ctx.lineTo(currentChartX + cellWidth, y10k);
+                                ctx.stroke();
+                                ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+                                ctx.fillText("10,000步目标", currentChartX + cellWidth, y10k - 10);
+
+                                if (allTimeAvg > 0) {
+                                    const yAvg = chartPlotY + chartDrawH - ((allTimeAvg / maxVal) * chartDrawH);
+                                    ctx.strokeStyle = currentColor;
+                                    ctx.globalAlpha = 0.5;
+                                    ctx.beginPath();
+                                    ctx.moveTo(currentChartX, yAvg); ctx.lineTo(currentChartX + cellWidth, yAvg);
+                                    ctx.stroke();
+                                    ctx.fillStyle = currentColor;
+                                    ctx.globalAlpha = 0.8;
+                                    ctx.fillText(`历史平均: ${allTimeAvg.toLocaleString()}`, currentChartX + cellWidth, yAvg - 10);
+                                }
+                                ctx.restore();
+                            }
+
+                            // 优化后的周分隔线逻辑
+                            // 寻找本周第一个有数据的点
+                            const firstThisWeekIdx = typeData.findIndex(d => {
+                                let dStr = d.date;
+                                // 容错处理：若无 date 属性则从 id 中解析
+                                if (!dStr && d.id) {
+                                    const parts = d.id.split('-');
+                                    if (parts.length >= 3) dStr = `${parts[0]}-${parts[1]}-${parts[2]}`;
+                                }
+                                if (!dStr) return false;
+                                const entryDate = new Date(dStr);
+                                entryDate.setHours(0, 0, 0, 0);
+                                return entryDate >= mondayDate;
+                            });
+
+                            // 判定条件：找到了本周数据，且它不是图表的第一条数据（意味着图表跨越了上周和本周）
+                            if (firstThisWeekIdx > 0) {
+                                ctx.save();
+                                // 坐标位置：本周第一点对应槽位的左侧边缘 (currentChartX + index * stepX)
+                                const mX = currentChartX + (firstThisWeekIdx * stepX);
+                                ctx.setLineDash([15, 15]);
+                                ctx.strokeStyle = "rgba(255, 255, 255, 0.3)"; // 保持低透明度，作为辅助背景
+                                ctx.lineWidth = 2;
+                                ctx.beginPath();
+                                ctx.moveTo(mX, chartPlotY);
+                                ctx.lineTo(mX, chartPlotY + chartDrawH);
+                                ctx.stroke();
+                                ctx.restore();
+                            }
+
+                            // 恢复实线状态，绘制 Y 轴刻度和标签
+                            ctx.setLineDash([]);
+                            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                            ctx.font = 'bold 20px Inter';
+                            ctx.textAlign = 'right';
+                            ctx.textBaseline = 'middle';
+
+                            const yTickRatios = [0, 0.25, 0.5, 0.75, 1];
+                            yTickRatios.forEach(ratio => {
+                                const y = chartPlotY + chartDrawH - (ratio * chartDrawH);
+                                let value = Math.round(maxVal * ratio);
+                                
+                                // 格式化大数值（步数等）
+                                let displayValue = value.toString();
+                                if (metricKey === 'num' && value >= 1000) {
+                                    displayValue = (value / 1000).toFixed(1) + 'k';
+                                }
+                                
+                                // 刻度线
+                                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                                ctx.lineWidth = 2;
+                                ctx.beginPath();
+                                ctx.moveTo(currentChartX, y);
+                                ctx.lineTo(currentChartX + 8, y);
+                                ctx.stroke();
+                                
+                                // 横向参考网格线（虚线）
+                                if (ratio > 0 && ratio < 1) {
+                                    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                                    ctx.lineWidth = 1;
+                                    ctx.setLineDash([5, 5]);
+                                    ctx.beginPath();
+                                    ctx.moveTo(currentChartX, y);
+                                    ctx.lineTo(currentChartX + cellWidth, y);
+                                    ctx.stroke();
+                                    ctx.setLineDash([]);
+                                }
+                                
+                                // 数值标签
+                                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                                ctx.fillText(displayValue, currentChartX - 12, y);
+                            });
+
+                            if (metricConfig.mode === ChartMode.BAR) {
+                                typeData.forEach((d, i) => {
+                                    const val = d[metricKey] || 0; const h = (val/maxVal) * chartDrawH;
+                                    const x = currentChartX + (i * stepX) + stepX * 0.1; const y = chartPlotY + chartDrawH - h; const bw = stepX * 0.8;
+                                    ctx.fillStyle = currentColor; ctx.beginPath(); ctx.roundRect(x, y, bw, h, [15,15,0,0]); ctx.fill();
+                                });
+                            } else {
+                                ctx.beginPath();
+                                typeData.forEach((d, i) => {
+                                    const val = d[metricKey] || 0; const x = currentChartX + (i * stepX) + stepX/2; const y = chartPlotY + chartDrawH - ((val / maxVal) * chartDrawH);
+                                    if (i === 0) ctx.moveTo(x, y);
+                                    else {
+                                        if (metricConfig.mode === ChartMode.CURVE) {
+                                            const prevVal = typeData[i-1][metricKey] || 0; 
+                                            const prevX = currentChartX + ((i-1) * stepX) + stepX/2; const prevY = chartPlotY + chartDrawH - ((prevVal / maxVal) * chartDrawH);
+                                            ctx.bezierCurveTo(prevX + (x-prevX)/2, prevY, prevX + (x-prevX)/2, y, x, y);
+                                        } else { ctx.lineTo(x, y); }
+                                    }
+                                });
+                                ctx.lineWidth = 8; ctx.strokeStyle = currentColor; ctx.shadowColor = currentColor; ctx.shadowBlur = 20;
+                                ctx.stroke(); ctx.shadowBlur = 0;
+                                typeData.forEach((d, i) => {
+                                    const val = d[metricKey] || 0; const x = currentChartX + (i * stepX) + stepX/2; const y = chartPlotY + chartDrawH - ((val / maxVal) * chartDrawH);
+                                    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.fillStyle = "#fff"; ctx.fill();
+                                });
+                            }
+
+                            if (typeData.length > 0) {
+                                ctx.font = "bold 18px Inter"; ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.textAlign = "center";
+                                const skipRate = typeData.length > 10 ? 2 : 1;
+                                typeData.forEach((d, i) => {
+                                    if (i % skipRate !== 0) return;
+                                    const cx = currentChartX + (i * stepX) + stepX / 2;
+                                    let dateStr = "";
+                                    if (d.id) { const parts = d.id.split('-'); if (parts.length >= 3) dateStr = `${parseInt(parts[1])}/${parseInt(parts[2])}`; }
+                                    ctx.fillText(dateStr, cx, chartPlotY + chartDrawH + 40);
+                                });
+                            }
+                        });
+                    });
+                };
+
+                if (userImage) {
+                    const img = new Image(); img.src = userImage; img.onload = () => renderFrame(img);
+                } else {
+                    renderFrame(null);
+                }
+
+            }, [insight, workouts, goals, visualSettings, sportConfigs, userImage, slogans]); 
+
+            const downloadPoster = () => {
+                const link = document.createElement('a');
+                link.download = `fitposter-${new Date().toISOString().slice(0,10)}.png`;
+                link.href = canvasRef.current.toDataURL('image/png');
+                link.click();
+            };
+
+            return (
+                <div className="bg-card/50 flex flex-col h-full w-full overflow-hidden relative">
+                    {isCropModalOpen && userImage && (
+                        <ImageCropModal src={userImage} onConfirm={handleCropConfirm} onCancel={() => setIsCropModalOpen(false)} />
+                    )}
+
+                    <div className="px-6 py-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4 shrink-0 bg-card border-b border-slate-800 z-10 shadow-sm">
+                        <div>
+                            <h2 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
+                                <Icon name="Sparkles" className="text-secondary" /> Wallpaper Generator
+                            </h2>
+                            <p className="text-slate-400 text-sm">Separated Charts by Sport Type</p>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-4">
+                            <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+                            
+                            <div className="flex items-center mr-2">
+                                {userImage ? (
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => setUserImage(null)} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/50 hover:bg-red-500/20 transition-colors">
+                                            <Icon name="Trash2" size={14} /> 移除
+                                        </button>
+                                        {visualSettings.useImageAsBackground && (
+                                            <button onClick={() => setIsCropModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium bg-slate-700 text-white border border-slate-600 hover:bg-slate-600 transition-colors">
+                                                <Icon name="Crop" size={14} /> 裁剪
+                                            </button>
+                                        )}
+                                        <button onClick={() => onVisualSettingsChange({ ...visualSettings, imageShape: imageShape === 'circle' ? 'original' : 'circle' })} className="px-3 py-1.5 rounded-md text-xs font-medium bg-dark border border-slate-700 text-slate-300">
+                                            {imageShape === 'circle' ? '圆形' : '原图'}
+                                        </button>
+                                        <button onClick={() => onVisualSettingsChange({ ...visualSettings, useImageAsBackground: !visualSettings.useImageAsBackground })} className={`px-3 py-1.5 rounded-md text-xs font-medium border ${visualSettings.useImageAsBackground ? 'bg-primary/20 border-primary text-primary' : 'bg-dark border-slate-700 text-slate-300'}`}>
+                                            {visualSettings.useImageAsBackground ? '背景开启' : '背景关闭'}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium bg-dark border border-slate-700 text-slate-300 hover:text-white transition-all">
+                                        <Icon name="ImagePlus" size={16} /> 插入图片
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="h-6 w-px bg-slate-700 mx-2"></div>
+
+                            <div className="flex gap-2">
+                                <Button onClick={downloadPoster} className="px-3 py-1.5 text-xs"><Icon name="Download" size={16} /> 下载 4K</Button>
+                                <Button onClick={handleRefresh} variant="secondary" className="px-3 py-1.5 text-xs"><Icon name="RefreshCw" size={16} /> 刷新</Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col min-h-0 bg-dark relative p-4">
+                        {workouts.length === 0 ? (
+                            <div className="flex-1 border-2 border-dashed border-slate-700 rounded-xl flex flex-col items-center justify-center bg-dark/30 gap-4">
+                                <Icon name="Dumbbell" size={48} className="text-slate-600" />
+                                <p className="text-slate-400">暂无运动数据</p>
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col min-h-0 fade-in relative">
+                                <div className="w-full h-full rounded-xl overflow-hidden shadow-2xl ring-1 ring-slate-700 flex items-center justify-center bg-dark/50">
+                                    <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        /**
+         * 统一的文件保存工具函数
+         * 优先使用 File System Access API，不支持时降级到传统下载
+         * @param {string} content - 文件内容
+         * @param {string} fileName - 建议的文件名
+         * @param {string} mimeType - MIME 类型
+         * @param {Object} directoryHandleRef - 用于存储文件夹句柄的 ref 对象
+         * @param {Object} fallbackWarningShownRef - 用于记录是否已显示降级提示的 ref 对象
+         */
+        const saveFileWithDialog = async (content, fileName, mimeType, directoryHandleRef, fallbackWarningShownRef) => {
+            // 检查浏览器是否支持 File System Access API
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const options = {
+                        suggestedName: fileName,
+                        types: [{
+                            description: 'File',
+                            accept: { [mimeType]: [fileName.split('.').pop()] }
+                        }]
+                    };
+
+                    // 如果有记住的文件夹句柄，使用它作为起始位置
+                    if (directoryHandleRef.current) {
+                        options.startIn = directoryHandleRef.current;
+                    }
+
+                    // 显示"另存为"对话框
+                    const handle = await window.showSaveFilePicker(options);
+                    
+                    // 获取可写流并写入内容
+                    const writable = await handle.createWritable();
+                    await writable.write(content);
+                    await writable.close();
+
+                    // 尝试记住父文件夹句柄（用于下次打开相同位置）
+                    try {
+                        // 注意：getDirectory() 可能不被所有浏览器支持
+                        // 这里我们尝试获取，失败也不影响核心功能
+                        const parentHandle = await handle.getParent?.();
+                        if (parentHandle) {
+                            directoryHandleRef.current = parentHandle;
+                        }
+                    } catch (e) {
+                        // 静默处理：某些浏览器可能不支持 getParent
+                        console.debug('无法获取父文件夹句柄:', e);
+                    }
+
+                    return true; // 保存成功
+                } catch (error) {
+                    // 用户取消对话框会抛出 AbortError
+                    if (error.name === 'AbortError') {
+                        // 静默处理取消操作
+                        return false;
+                    }
+                    
+                    // 其他错误：记录到控制台并降级
+                    console.warn('File System Access API 失败，降级到传统下载:', error);
+                    // 继续执行降级方案
+                }
+            }
+
+            // 降级方案：使用传统的 <a> 标签下载方式
+            // 首次使用时显示提示
+            if (fallbackWarningShownRef && !fallbackWarningShownRef.current) {
+                alert('您的浏览器不支持路径选择功能，将使用默认下载方式');
+                fallbackWarningShownRef.current = true;
+            }
+
+            // 创建 Blob 和下载链接
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            return true;
+        };
+
+        const App = () => {
+            const [workouts, setWorkouts] = useState([]);
+            const [view, setView] = useState('log'); 
+            
+            // 增加标语状态
+            const [slogans, setSlogans] = useState(() => {
+                const saved = localStorage.getItem('fitposter_slogans');
+                return saved || "- 坚持就是胜利\n- 让汗水变成勋章\n- 每一滴汗水都是成功的基石\n- 自律即自由\n- 重新定义你的极限";
+            });
+
+            const [visualSettings, setVisualSettings] = useState(() => {
+                const saved = localStorage.getItem('fitposter_visual_settings');
+                const defaultSettings = {
+                    style: PosterStyle.NATURE,
+                    imageSize: 300,
+                    imageShape: 'circle',
+                    useImageAsBackground: false,
+                    bgOpacity: 0.15,
+                    bgBlur: 60 
+                };
+                const settings = saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
+                return { ...settings, style: PosterStyle.NATURE }; 
+            });
+
+            const [goals, setGoals] = useState(() => {
+                const saved = localStorage.getItem('fitposter_goals');
+                return saved ? JSON.parse(saved) : { title: "", subtitle: "", targetDate: "" };
+            });
+
+            const [sportConfigs, setSportConfigs] = useState(() => {
+                const saved = localStorage.getItem('fitposter_sport_configs');
+                return saved ? JSON.parse(saved) : {};
+            });
+
+            // 全局图表数据展示量设置（单位：天）
+            const [chartDataDays, setChartDataDays] = useState(() => {
+                const saved = localStorage.getItem('fitposter_chart_data_days');
+                return saved ? parseInt(saved) : 10;
+            });
+
+            // 数据持久化
+            useEffect(() => { localStorage.setItem('fitposter_visual_settings', JSON.stringify(visualSettings)); }, [visualSettings]);
+            useEffect(() => { localStorage.setItem('fitposter_sport_configs', JSON.stringify(sportConfigs)); }, [sportConfigs]);
+            // 持久化图表数据展示量
+            useEffect(() => { localStorage.setItem('fitposter_chart_data_days', chartDataDays.toString()); }, [chartDataDays]);
+
+            useEffect(() => { localStorage.setItem('fitposter_goals', JSON.stringify(goals)); }, [goals]);
+            useEffect(() => { localStorage.setItem('fitposter_slogans', slogans); }, [slogans]);
+
+            useEffect(() => {
+                const loadData = async () => {
+                    const saved = localStorage.getItem('fitposter_workouts');
+                    if (saved) { setWorkouts(JSON.parse(saved)); return; }
+                    try {
+                        const response = await fetch('./data/metadata.json');
+                        if (response.ok) {
+                            const jsonData = await response.json();
+                            if (Array.isArray(jsonData)) setWorkouts(jsonData);
+                        }
+                    } catch (err) { console.log("No initial source found."); }
+                };
+                loadData();
+            }, []);
+
+            useEffect(() => {
+                if (workouts.length > 0) localStorage.setItem('fitposter_workouts', JSON.stringify(workouts));
+            }, [workouts]);
+
+            return (
+                <div className="min-h-screen bg-dark text-slate-200 flex flex-col">
+                    <nav className="bg-dark/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 shrink-0">
+                        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('log')}>
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                                    <Icon name="Dumbbell" className="text-white" size={20} />
+                                </div>
+                                <span className="font-bold text-xl text-white">FitPoster Local</span>
+                            </div>
+                            
+                            <div className="flex gap-2 bg-card/50 p-1 rounded-lg border border-slate-700">
+                                <button onClick={() => setView('log')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${view === 'log' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
+                                    <Icon name="Activity" size={16} /> 数据管理
+                                </button>
+                                <button onClick={() => setView('poster')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${view === 'poster' ? 'bg-primary text-dark shadow font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                    <Icon name="Sparkles" size={16} /> 生成壁纸
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="flex-1 overflow-hidden flex flex-col">
+                        {view === 'log' && (
+                            <div className="flex-1 overflow-y-auto custom-scrollbar bg-dark">
+                                <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+                                    {/* 数据管理顶部网格：改为三列 */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                        <div className="lg:col-span-1">
+                                            <DataOverviewPanel workouts={workouts} goals={goals} onGoalsChange={setGoals} />
+                                        </div>
+                                        <div className="lg:col-span-1 min-h-[400px]">
+                                            <SloganManager slogans={slogans} onUpdate={setSlogans} />
+                                        </div>
+                                        <div className="lg:col-span-1 min-h-[400px]">
+                                            <JsonEditor workouts={workouts} onUpdate={setWorkouts} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <VisualConfigPanel 
+                                            workouts={workouts} sportConfigs={sportConfigs}
+                                            onConfigChange={(newConfigs) => setSportConfigs(newConfigs)} 
+                                            visualSettings={visualSettings}
+                                            chartDataDays={chartDataDays}
+                                            onChartDataDaysChange={setChartDataDays}
+                                        />
+                                    </div>
+                                    <div className="h-8"></div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'poster' && (
+                            <div className="flex-1 bg-dark flex flex-col h-full overflow-hidden">
+                                <PosterGenerator 
+                                    workouts={workouts} goals={goals}
+                                    visualSettings={visualSettings} sportConfigs={sportConfigs}
+                                    onVisualSettingsChange={setVisualSettings}
+                                    slogans={slogans}
+                                    chartDataDays={chartDataDays}
+                                />
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+    
+    <!-- 资源加载检测脚本 -->
+    <script>
+        // 重试计数器（使用 sessionStorage 跨页面刷新保持）
+        const RETRY_COUNT_KEY = 'fitposter_retry_count';
+        
+        function getRetryCount() {
+            return parseInt(sessionStorage.getItem(RETRY_COUNT_KEY) || '0');
+        }
+        
+        function incrementRetryCount() {
+            const count = getRetryCount() + 1;
+            sessionStorage.setItem(RETRY_COUNT_KEY, count.toString());
+            return count;
+        }
+        
+        function resetRetryCount() {
+            sessionStorage.removeItem(RETRY_COUNT_KEY);
+        }
+        
+        // 检测关键资源是否加载成功
+        function checkResources() {
+            const resources = [
+                { name: 'React', check: () => typeof window.React !== 'undefined', label: 'React 核心库未加载' },
+                { name: 'ReactDOM', check: () => typeof window.ReactDOM !== 'undefined', label: 'ReactDOM 库未加载' },
+                { name: 'Babel', check: () => typeof window.Babel !== 'undefined', label: 'Babel 转译器未加载' },
+                { name: 'Tailwind', check: () => typeof window.tailwind !== 'undefined', label: 'Tailwind CSS 未加载' }
+            ];
+            
+            const failed = resources.filter(r => !r.check());
+            return {
+                success: failed.length === 0,
+                failed: failed
+            };
+        }
+        
+        // 显示错误界面
+        function showError(failedResources) {
+            const loadingState = document.getElementById('loading-state');
+            const errorState = document.getElementById('error-state');
+            const errorDetails = document.getElementById('error-details');
+            
+            // 隐藏 Loading，显示错误
+            loadingState.style.display = 'none';
+            errorState.style.display = 'block';
+            
+            // 填充失败项列表
+            errorDetails.innerHTML = failedResources.map(r => 
+                `<div class="error-item">${r.label}</div>`
+            ).join('');
+            
+            // 检查重试次数，显示警告
+            const retryCount = getRetryCount();
+            if (retryCount >= 3) {
+                const warning = document.getElementById('retry-warning');
+                warning.classList.add('show');
+            }
+        }
+        
+        // 处理重试按钮点击
+        function handleRetry() {
+            incrementRetryCount();
+            location.reload();
+        }
+        
+        // 切换帮助信息显示
+        function toggleHelp() {
+            const helpSection = document.getElementById('help-section');
+            helpSection.classList.toggle('show');
+        }
+        
+        // 隐藏加载覆盖层
+        function hideLoader() {
+            const overlay = document.getElementById('resource-loader-overlay');
+            overlay.classList.add('hidden');
+            
+            // 动画结束后移除元素（释放资源）
+            setTimeout(() => {
+                overlay.remove();
+            }, 300);
+            
+            // 加载成功，重置重试计数器
+            resetRetryCount();
+        }
+        
+        // 执行检测
+        (function() {
+            // 等待当前脚本执行完成后立即检测
+            setTimeout(() => {
+                const result = checkResources();
+                
+                if (result.success) {
+                    // 所有资源加载成功
+                    hideLoader();
+                } else {
+                    // 有资源加载失败
+                    showError(result.failed);
+                }
+            }, 0);
+        })();
+    </script>
+</body>
+</html>
